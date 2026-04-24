@@ -74,8 +74,8 @@ ssh_reachable() {
 # =============================================================================
 _open_tunnel() {
   local entry="$1"
-  local remote_host ssh_port alias remote_port local_port
-  IFS=':' read -r remote_host ssh_port alias remote_port local_port <<< "$entry"
+  local remote_host ssh_port alias tunnel_host remote_port local_port
+  IFS=':' read -r remote_host ssh_port alias tunnel_host remote_port local_port <<< "$entry"
 
   mkdir -p "$TUNNEL_PID_DIR"
   local pid_file="${TUNNEL_PID_DIR}/${alias}_${local_port}.pid"
@@ -87,11 +87,11 @@ _open_tunnel() {
   fi
 
   ssh $SSH_OPTS -p "$ssh_port" \
-    -L "${local_port}:127.0.0.1:${remote_port}" \
+    -L "${local_port}:${tunnel_host}:${remote_port}" \
     -N -f "${SSH_USER}@${remote_host}" 2>/dev/null || return 1
 
   local tunnel_pid
-  tunnel_pid=$(pgrep -f "ssh.*${local_port}:127.0.0.1:${remote_port}.*${remote_host}" | head -1)
+  tunnel_pid=$(pgrep -f "ssh.*${local_port}:${tunnel_host}:${remote_port}.*${remote_host}" | head -1)
   [[ -n "$tunnel_pid" ]] && echo "$tunnel_pid" > "$pid_file"
   return 0
 }

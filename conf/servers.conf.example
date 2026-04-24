@@ -2,24 +2,24 @@
 # conf/servers.conf
 # 서버 접속 정보 및 네트워크 설정
 #
-# 공인 IP: 211.54.64.195
+# 공인 IP: YOUR_PUBLIC_IP
 # 포트 포워딩 구조: 공인IP:외부포트 → 내부IP:내부포트
 #
 # | 내부 IP       | 외부 포트 | 내부 포트 | 역할            |
 # |---------------|-----------|-----------|-----------------|
-# | 192.168.0.209 | 2009      | 22        | Nginx SSH       |
+# | 192.168.x.x | 2009      | 22        | Nginx SSH       |
 # |               | 2080      | 80        | Nginx HTTP      |
 # |               | 19100     | 9100      | 모니터링 프록시  |
-# | 192.168.0.121 | 2010      | 22        | Spring-01 SSH   |
-# | 192.168.0.233 | 2011      | 22        | Spring-02 SSH   |
-# | 192.168.0.136 | 2012      | 22        | Redis-01 SSH    |
-# | 192.168.0.45  | 2013      | 22        | Redis-02 SSH    |
-# | 192.168.0.144 | 2014      | 22        | Redis-03 SSH    |
-# | 192.168.0.247 | 2016      | 22        | MySQL-01 SSH    |
-# | 192.168.0.225 | 2017      | 22        | MySQL-02 SSH    |
+# | 192.168.x.x | 2010      | 22        | Spring-01 SSH   |
+# | 192.168.x.x | 2011      | 22        | Spring-02 SSH   |
+# | 192.168.x.x | 2012      | 22        | Redis-01 SSH    |
+# | 192.168.x.x  | 2013      | 22        | Redis-02 SSH    |
+# | 192.168.x.x | 2014      | 22        | Redis-03 SSH    |
+# | 192.168.x.x | 2016      | 22        | MySQL-01 SSH    |
+# | 192.168.x.x | 2017      | 22        | MySQL-02 SSH    |
 # =============================================================================
 
-PUBLIC_IP="211.54.64.195"
+PUBLIC_IP="YOUR_PUBLIC_IP"
 
 # ── SSH ───────────────────────────────────────────────────────────────────────
 SSH_USER="ops"
@@ -56,8 +56,8 @@ NGINX_PROXY_BASE="http://${PUBLIC_IP}:${NGINX_MONITORING_PORT}"
 # ── Spring Actuator (19100 경유) ──────────────────────────────────────────────
 # SPRING_SERVERS 배열과 인덱스 순서 반드시 일치
 SPRING_ACTUATOR_URLS=(
-  "${NGINX_PROXY_BASE}/actuator/121"    # → 192.168.0.121:8080/actuator/
-  "${NGINX_PROXY_BASE}/actuator/233"    # → 192.168.0.233:8080/actuator/
+  "${NGINX_PROXY_BASE}/actuator/121"    # → 192.168.x.x:8080/actuator/
+  "${NGINX_PROXY_BASE}/actuator/233"    # → 192.168.x.x:8080/actuator/
 )
 
 # ── Node Exporter 프록시 URL (19100 경유) ─────────────────────────────────────
@@ -82,16 +82,20 @@ REDIS_EXPORTER_URLS=(
 )
 
 # ── mysqld_exporter — 현재 monitoring.conf 에 경로 없음 ──────────────────────
-# 추가 시: location /mysqld/247/ { proxy_pass http://192.168.0.247:9104/; }
-MYSQLD_EXPORTER_URLS=()   # 미설정 시 점검 건너뜀
+# 추가 시: location /mysqld/247/ { proxy_pass http://192.168.x.x:9104/; }
+MYSQLD_EXPORTER_URLS=(
+  "mysql-primary:${NGINX_PROXY_BASE}/mysqld/247"
+  "mysql-replica:${NGINX_PROXY_BASE}/mysqld/225"
+)
 
 # ── Redis SSH 터널 (redis-cli 명령용) ─────────────────────────────────────────
 REDIS_AUTH="${REDIS_AUTH:-}"
 REDIS_TUNNEL_MAP=(
-  "${PUBLIC_IP}:2012:redis-01:6379:16379"
-  "${PUBLIC_IP}:2013:redis-02:6379:16380"
-  "${PUBLIC_IP}:2014:redis-03:6379:16381"
+  "${PUBLIC_IP}:2012:redis-01:192.168.x.x:6379:16379"
+  "${PUBLIC_IP}:2013:redis-02:192.168.x.x:6379:16380"
+  "${PUBLIC_IP}:2014:redis-03:192.168.x.x:6379:16381"
 )
+
 REDIS_CLUSTER_NODES=(
   "127.0.0.1:16379"
   "127.0.0.1:16380"
@@ -100,18 +104,18 @@ REDIS_CLUSTER_NODES=(
 
 # ── MySQL SSH 터널 (mysql 쿼리용) ─────────────────────────────────────────────
 MYSQL_TUNNEL_MAP=(
-  "${PUBLIC_IP}:2016:mysql-primary:3306:13306"
-  "${PUBLIC_IP}:2017:mysql-replica:3306:13307"
+  "${PUBLIC_IP}:2016:mysql-primary:192.168.x.x:3306:13306"
+  "${PUBLIC_IP}:2017:mysql-replica:192.168.x.x:3306:13307"
 )
 MYSQL_PRIMARY_HOST="127.0.0.1"; MYSQL_PRIMARY_PORT=13306
 MYSQL_REPLICA_HOST="127.0.0.1"; MYSQL_REPLICA_PORT=13307
 MYSQL_PORT=3306
-MYSQL_USER="ops_check"
+MYSQL_USER="YOUR_DB_USER"
 MYSQL_PASS="${MYSQL_OPS_PASS:-}"
 MYSQL_CNF="${MYSQL_CNF:-${HOME}/.my.cnf}"
 
 # ── 경로 설정 ─────────────────────────────────────────────────────────────────
-REMOTE_AGENT_DIR="/opt/ops-check/remote-agent"
+REMOTE_AGENT_DIR="/home/ops/ops-check/remote-agent"
 REMOTE_AGENT_SCRIPT="${REMOTE_AGENT_DIR}/local_check.sh"
 MONITOR_LOG_DIR="${OPS_LOG_DIR:-/var/log/ops-check}"
 REPORT_DIR="${MONITOR_LOG_DIR}/reports"

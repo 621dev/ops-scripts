@@ -1,0 +1,17 @@
+# 서버 접속 정보 — 절대 커밋 금지
+conf/servers.conf
+
+# 로그 및 리포트
+*.log
+reports/
+overnight/
+
+# SSH 키
+*.pem
+*.rsa
+*.key
+id_rsa*
+
+# 환경변수 파일
+.env
+*.env
