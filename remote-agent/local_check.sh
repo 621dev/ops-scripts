@@ -124,9 +124,9 @@ collect_nginx() {
   nginx_master_pid=$(pgrep -f "nginx: master" 2>/dev/null | head -1)
   nginx_worker_count=$(pgrep -c -f "nginx: worker" 2>/dev/null || echo 0)
 
-  # nginx -t 결과
   local nginx_conf_ok nginx_conf_msg
   nginx_conf_msg=$(nginx -t 2>&1) && nginx_conf_ok="true" || nginx_conf_ok="false"
+  CONF_MSG=$(echo "$nginx_conf_msg" | head -3 | tr '\n' ' ' | sed "s/'/\"/g")  # ← 추가
 
   # 에러 로그 최근 5분
   local error_log="/var/log/nginx/error.log"
@@ -137,31 +137,31 @@ collect_nginx() {
     error_5m=$(awk -v d="$five_ago" \
       'substr($0,1,16) >= d && /\[error\]|\[crit\]|\[emerg\]/{c++} END{print c+0}' \
       "$error_log" 2>/dev/null || echo 0)
-    # 에러 패턴 Top 3
     error_patterns=$(grep -E '\[error\]|\[crit\]|\[emerg\]' "$error_log" 2>/dev/null \
       | tail -200 | awk '{$1=$2=$3=""; print $0}' | sort | uniq -c | sort -rn | head -3 \
       | sed 's/"/\\"/g' | tr '\n' '|' | sed 's/|$//')
   fi
 
-  # 디스크 (로그 디렉토리)
   local disk_log
   disk_log=$(df /var/log/nginx 2>/dev/null | awk 'NR==2{gsub(/%/,"",$5); print $5}' || echo 0)
 
-  OUT=$(python3 -c "
-import json
-d=json.loads('$OUT') if '$OUT' != '{}' else {}
+  OUT=$(CONF_MSG="$CONF_MSG" python3 -c "
+import json, os
+d = json.loads('$OUT') if '$OUT' != '{}' else {}
 try:
     d['nginx'] = {
       'master_pid': '${nginx_master_pid:-}',
       'worker_count': ${nginx_worker_count},
       'conf_ok': ${nginx_conf_ok},
-      'conf_msg': '$(echo "$nginx_conf_msg" | head -3 | sed "s/'/\\\\'/" | tr '\n' ' ')',
+      'conf_msg': os.environ.get('CONF_MSG',''),
       'error_log_5m': ${error_5m},
       'error_patterns': '${error_patterns}',
       'disk_log_pct': ${disk_log}
     }
     print(json.dumps(d))
-except:
+except Exception as e:
+    import sys
+    print(e, file=sys.stderr)
     print(json.dumps(d))
 " 2>/dev/null || echo "$OUT")
 }

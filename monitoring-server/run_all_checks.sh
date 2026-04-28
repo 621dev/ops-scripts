@@ -64,4 +64,44 @@ esac
 
 echo ""
 echo -e "${GREEN}${BOLD}✔ 점검 완료. 로그: $MONITOR_LOG_DIR${NC}"
+
+# ── 로그 분리 저장 ────────────────────────────────────────────────────────────
+DAILY_DIR="${MONITOR_LOG_DIR}/daily"
+ALERT_DIR="${MONITOR_LOG_DIR}/alerts"
+mkdir -p "$DAILY_DIR" "$ALERT_DIR"
+
+TODAY=$(date '+%Y%m%d')
+NOW=$(date '+%Y-%m-%d %H:%M:%S')
+DAILY_LOG="${DAILY_DIR}/${TODAY}.log"
+ALERT_LOG="${ALERT_DIR}/${TODAY}_alerts.log"
+
+# 최신 로그 파일에서 한 줄 포맷으로 변환
+LATEST_LOG=$(ls -t "${MONITOR_LOG_DIR}"/*.log 2>/dev/null | head -1)
+
+if [[ -n "$LATEST_LOG" ]]; then
+  # [시간] [위험도] [내용] 형식으로 변환
+  grep -E "\[OK\]|\[WARN\]|\[FAIL\]|\[INFO\]" "$LATEST_LOG" \
+    | sed 's/\x1b\[[0-9;]*m//g' \
+    | sed -E "s/[[:space:]]*\[OK\][[:space:]]*/[${NOW}] [OK]    /g" \
+    | sed -E "s/[[:space:]]*\[WARN\][[:space:]]*/[${NOW}] [WARN]  /g" \
+    | sed -E "s/[[:space:]]*\[FAIL\][[:space:]]*/[${NOW}] [FAIL]  /g" \
+    | sed -E "s/[[:space:]]*\[INFO\][[:space:]]*/[${NOW}] [INFO]  /g" \
+    >> "$DAILY_LOG"
+
+  # 구분선 추가
+  echo "── 점검 완료: ${NOW}  대상: ${TARGET_ROLE}  FAIL:${RESULT_FAIL}건  WARN:${RESULT_WARN}건  OK:${RESULT_OK}건" \
+    >> "$DAILY_LOG"
+
+  # FAIL/WARN 만 alerts 로그에 저장
+  if [[ $RESULT_FAIL -gt 0 || $RESULT_WARN -gt 0 ]]; then
+    grep -E "\[OK\]|\[WARN\]|\[FAIL\]" "$LATEST_LOG" \
+      | grep -E "\[WARN\]|\[FAIL\]" \
+      | sed 's/\x1b\[[0-9;]*m//g' \
+      | sed -E "s/[[:space:]]*\[WARN\][[:space:]]*/[${NOW}] [WARN]  /g" \
+      | sed -E "s/[[:space:]]*\[FAIL\][[:space:]]*/[${NOW}] [FAIL]  /g" \
+      >> "$ALERT_LOG"
+    echo "── ${NOW}  FAIL:${RESULT_FAIL}건  WARN:${RESULT_WARN}건" >> "$ALERT_LOG"
+  fi
+fi
+
 # trap에 의해 close_tunnels 자동 실행
