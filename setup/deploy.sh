@@ -128,7 +128,7 @@ sleep 1
 
 TUNNEL_FAIL=0
 for entry in "${REDIS_TUNNEL_MAP[@]}"; do
-  IFS=':' read -r _ _ alias _ local_port <<< "$entry"
+  IFS=':' read -r _ _ alias _ _ local_port <<< "$entry"
   if check_tunnel_alive "$local_port" "redis[$alias]"; then
     log_ok "Redis 터널 [$alias] → 127.0.0.1:${local_port}"
     # redis-cli 로 실제 PING 확인
@@ -147,7 +147,7 @@ open_tunnels mysql
 sleep 1
 
 for entry in "${MYSQL_TUNNEL_MAP[@]}"; do
-  IFS=':' read -r _ _ alias _ local_port <<< "$entry"
+  IFS=':' read -r _ _ alias _ _ local_port <<< "$entry"
   if check_tunnel_alive "$local_port" "mysql[$alias]"; then
     log_ok "MySQL 터널 [$alias] → 127.0.0.1:${local_port}"
     # mysql 로 실제 접속 확인
