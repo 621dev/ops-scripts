@@ -86,12 +86,14 @@ collect_system() {
   # 커널 이벤트 (최근 60분)
   local kernel_errors
   kernel_errors=$(journalctl -k --since "-60min" -p err..emerg --no-pager 2>/dev/null \
-    | grep -c . || echo 0)
+    | grep -c . 2>/dev/null || true)
+  kernel_errors=${kernel_errors:-0}
 
   # OOM (최근 60분)
   local oom_count
   oom_count=$(journalctl -k --since "-60min" --no-pager 2>/dev/null \
-    | grep -c "Out of memory\|oom_kill_process" || echo 0)
+    | grep -c "Out of memory\|oom_kill_process" 2>/dev/null || true)
+  oom_count=${oom_count:-0}
 
   OUT=$(python3 -c "
 import json
