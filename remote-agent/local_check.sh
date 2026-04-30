@@ -146,37 +146,43 @@ collect_nginx() {
 
   local disk_log
   disk_log=$(df /var/log/nginx 2>/dev/null | awk 'NR==2{gsub(/%/,"",$5); print $5}' || echo 0)
-
-  OUT=$(CONF_MSG="$CONF_MSG" python3 -c "
+  OUT=$(CONF_MSG="$CONF_MSG" \
+        ERROR_PATTERNS="$error_patterns" \
+        OUT_JSON="$OUT" \
+        MASTER_PID="${nginx_master_pid:-}" \
+        WORKER_COUNT="${nginx_worker_count}" \
+        CONF_OK="${nginx_conf_ok}" \
+        ERROR_5M="${error_5m}" \
+        DISK_LOG="${disk_log}" \
+        python3 -c "
 import json, os
-d = json.loads('$OUT') if '$OUT' != '{}' else {}
+d = json.loads(os.environ.get('OUT_JSON', '{}'))
 try:
     d['nginx'] = {
-      'master_pid': '${nginx_master_pid:-}',
-      'worker_count': ${nginx_worker_count},
-      'conf_ok': ${nginx_conf_ok},
+      'master_pid': os.environ.get('MASTER_PID',''),
+      'worker_count': int(os.environ.get('WORKER_COUNT', 0)),
+      'conf_ok': os.environ.get('CONF_OK','false') == 'true',
       'conf_msg': os.environ.get('CONF_MSG',''),
-      'error_log_5m': ${error_5m},
-      'error_patterns': '${error_patterns}',
-      'disk_log_pct': ${disk_log}
+      'error_log_5m': int(os.environ.get('ERROR_5M', 0)),
+      'error_patterns': os.environ.get('ERROR_PATTERNS',''),
+      'disk_log_pct': int(os.environ.get('DISK_LOG', 0))
     }
     print(json.dumps(d))
 except Exception as e:
     import sys
     print(e, file=sys.stderr)
     print(json.dumps(d))
-" 2>/dev/null || echo "$OUT")
-}
+" 2>&1)
 
 # ── Spring Boot 로컬 점검 ────────────────────────────────────────────────
 collect_springboot() {
-  local app_name="${APP_NAME:-messaging-service}"
-  local app_log="${APP_LOG:-/var/log/${app_name}/application.log}"
-  local gc_log="${GC_LOG:-/var/log/${app_name}/gc.log}"
-
-  # 프로세스
-  local app_pid app_uptime_min rss_mb fd_count fd_limit fd_pct
-  app_pid=$(pgrep -f "$app_name" 2>/dev/null | head -1)
+  # 1. 프로세스는 두 서버 공통인 jar 파일명으로 찾기
+  local proc_pattern="messaging/engine.jar"
+  # 2. 로그는 각 서버의 이름에 맞게 자동 설정
+  local svr_name=$(hostname -s)
+  local app_log="/var/log/app/${svr_name}.log"
+  # 3. PID 추출
+  app_pid=$(pgrep -f "$proc_pattern" 2>/dev/null | head -1)
 
   if [[ -n "$app_pid" ]]; then
     local uptime_sec
